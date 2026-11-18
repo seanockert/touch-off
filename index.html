@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link rel="apple-touch-icon" href="icon.png" />
+    <link rel="shortcut icon" href="icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0c1923" />
+    <title>Touch-Off</title>
+    <meta
+      name="description"
+      content="Everyone touch the screen. Hold still... Win! (or lose)"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+
+      :root {
+        --color-0: #4c74eb;
+        --color-1: #ffcc00;
+        --color-2: #ff0088;
+        --color-3: #9c4ceb;
+        --color-4: #22d3ee;
+        --color-active: #ffffff;
+        --timing: 3s;
+        --easing: linear(
+          0,
+          0.402 7.4%,
+          0.711 15.3%,
+          0.929 23.7%,
+          1.008 28.2%,
+          1.067 33%,
+          1.099 36.9%,
+          1.12 41%,
+          1.13 45.4%,
+          1.13 50.1%,
+          1.111 58.5%,
+          1.019 83.2%,
+          1.004 91.3%,
+          1
+        );
+      }
+
+      body,
+      html {
+        background-color: #0c1923;
+        background-image: linear-gradient(
+          in oklch 45deg,
+          #0c1923,
+          #0f2536 40%,
+          #290c3a 100%
+        );
+        color: #f0f0f0;
+        font-family: sans-serif;
+        height: 100%;
+        overflow: hidden;
+        padding: 0;
+        width: 100%;
+      }
+
+      body {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        user-select: none;
+      }
+
+      #container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      #instructions {
+        font-size: 1.25rem;
+        padding: 1rem;
+        pointer-events: none;
+        position: absolute;
+        text-align: center;
+        text-wrap: balance;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        transition: opacity 0.5s ease;
+        z-index: 0;
+        width: 350px;
+      }
+
+      #hint {
+        font-size: 1.25rem;
+        font-weight: bold;
+        left: 0;
+        opacity: 0;
+        pointer-events: none;
+        position: absolute;
+        right: 0;
+        text-align: center;
+        text-transform: uppercase;
+        top: calc(env(safe-area-inset-top) + 2rem);
+        transition: opacity 0.3s ease;
+        z-index: 3;
+      }
+
+      #hint.visible {
+        opacity: 1;
+      }
+
+      #flood {
+        background-color: var(--flood-color, transparent);
+        clip-path: circle(0 at var(--flood-x, 50%) var(--flood-y, 50%));
+        inset: 0;
+        opacity: 0.35;
+        pointer-events: none;
+        position: absolute;
+        z-index: 1;
+      }
+
+      #flood.visible {
+        clip-path: circle(150vmax at var(--flood-x, 50%) var(--flood-y, 50%));
+        transition: clip-path 0.8s ease-out;
+      }
+
+      h1 {
+        font-weight: bold;
+        letter-spacing: -0.05em;
+        line-height: 1;
+        margin: 0 auto;
+        text-transform: uppercase;
+      }
+
+      h1 > :nth-child(1) {
+        font-size: 3.1rem;
+      }
+
+      h1 > :nth-child(2) {
+        font-size: 3.5rem;
+      }
+
+      h1 > :nth-child(3) {
+        font-size: 2.7rem;
+      }
+      h1 > :nth-child(3) span {
+        color: #97aebf;
+      }
+
+      /* JS sets position and squash here. CSS animates the inner .ring. */
+      .touch-point {
+        height: var(--touch-size);
+        left: 0;
+        margin: calc(var(--touch-size) / -2) 0 0 calc(var(--touch-size) / -2);
+        pointer-events: none;
+        position: absolute;
+        top: 0;
+        width: var(--touch-size);
+        will-change: transform;
+        z-index: 2;
+      }
+
+      .touch-point.slot-0 {
+        --c: var(--color-0);
+      }
+      .touch-point.slot-1 {
+        --c: var(--color-1);
+      }
+      .touch-point.slot-2 {
+        --c: var(--color-2);
+      }
+      .touch-point.slot-3 {
+        --c: var(--color-3);
+      }
+      .touch-point.slot-4 {
+        --c: var(--color-4);
+      }
+
+      .ring {
+        animation: ring-pulse var(--timing) infinite var(--easing);
+        border-radius: 50%;
+        border: 2px solid var(--c);
+        box-shadow: 0 0 10px var(--c);
+        height: 100%;
+        transition: transform 0.15s ease, border-color 0.15s ease,
+          box-shadow 0.15s ease;
+        width: 100%;
+      }
+
+      .ring::before,
+      .ring::after {
+        border-radius: 50%;
+        content: "";
+        position: absolute;
+      }
+
+      .ring::before {
+        animation: aura-pulse var(--timing) infinite var(--easing);
+        background: radial-gradient(circle, transparent 40%, var(--c) 70%);
+        filter: blur(15px);
+        inset: -10px;
+      }
+
+      .ring::after {
+        animation: radial-embers var(--timing) infinite var(--easing);
+        box-shadow: 0 0 10px var(--c), 0 0 15px var(--c);
+        inset: 0;
+      }
+
+      @keyframes ring-pulse {
+        0%,
+        100% {
+          transform: scale(0.95);
+        }
+        70% {
+          transform: scale(1.05);
+        }
+      }
+
+      @keyframes radial-embers {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        70% {
+          transform: scale(1.3);
+          opacity: 0;
+        }
+      }
+
+      @keyframes aura-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.4;
+        }
+        70% {
+          transform: scale(1.3);
+          opacity: 0.7;
+        }
+      }
+
+      /* No pulse during the spin, so the highlight is clear. */
+      .spinning .ring {
+        animation: none;
+        transform: scale(0.9);
+      }
+
+      .touch-point.active .ring {
+        border-color: var(--color-active);
+        box-shadow: 0 0 25px var(--color-active), 0 0 10px var(--c) inset;
+        transform: scale(1.15);
+      }
+
+      .touch-point.winner .ring {
+        animation: pulse-winner 0.7s infinite alternate ease-in-out;
+        background-color: var(--c);
+        border-color: var(--color-active);
+        box-shadow: 0 0 40px var(--c);
+      }
+
+      @keyframes pulse-winner {
+        from {
+          transform: scale(1);
+        }
+        to {
+          transform: scale(1.4);
+        }
+      }
+
+      .touch-point.loser .ring {
+        animation: fade-out-loser 1s forwards;
+      }
+
+      @keyframes fade-out-loser {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+          transform: scale(0.8);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ring,
+        .ring::before,
+        .ring::after,
+        .touch-point.winner .ring {
+          animation: none;
+        }
+        .touch-point.loser .ring {
+          animation: none;
+          opacity: 0.2;
+        }
+        #flood.visible {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+    <div id="flood"></div>
+    <div id="instructions">
+      <h1>
+        <span>Touch here</span>
+        <span>Hold still</span>
+        <span>Win! <span>(or lose)</span> </span>
+      </h1>
+    </div>
+    <div id="hint">Need 2+ players</div>
+    <script>
+      const touchContainer = document.getElementById("container");
+      const instructions = document.getElementById("instructions");
+      const hint = document.getElementById("hint");
+      const flood = document.getElementById("flood");
+
+      const TOUCH_SIZE = 160;
+      const TOUCH_RADIUS = TOUCH_SIZE / 2;
+      const MAX_TOUCHES = 5;
+      const MIN_PLAYERS = 2;
+      const STABILITY_DELAY = 1000;
+      const MOVEMENT_THRESHOLD = 10;
+      const MIN_RESULT_DISPLAY = 2000;
+
+      // Tuned per 60 Hz frame. Scaled by real frame time.
+      const FRAME_MS = 1000 / 60;
+      const MAX_FRAME_STEP = 2;
+      const SPRING_STRENGTH = 0.01;
+      const REPULSION_STRENGTH = 0.5;
+      const DAMPING = 0.92;
+      const SQUASH_FACTOR = 0.02;
+      const MAX_SQUASH = 0.3;
+
+      const SPIN_CYCLES = 3;
+      const SPIN_DELAY = 100;
+      const SPIN_SLOWDOWN = 50;
+
+      document.documentElement.style.setProperty(
+        "--touch-size",
+        `${TOUCH_SIZE}px`
+      );
+
+      const reducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      );
+
+      // "waiting" -> "spinning" -> "result" -> "waiting"
+      let phase = "waiting";
+      const touchPoints = new Map();
+      let stabilityTimer = null;
+      let resultShownAt = 0;
+      let resetTimeout = null;
+      let physicsAnimationId = null;
+      let lastFrameTime = null;
+
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      // Must start from a user gesture.
+      let audioContext = null;
+
+      const unlockAudio = () => {
+        if (!audioContext) {
+          const AudioContextClass =
+            window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          audioContext = new AudioContextClass();
+        }
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+      };
+
+      const playTone = (frequency, startOffset, duration, volume) => {
+        if (!audioContext || audioContext.state !== "running") return;
+        const start = audioContext.currentTime + startOffset;
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = "triangle";
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(volume, start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        oscillator.connect(gain).connect(audioContext.destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration);
+      };
+
+      const tick = () => {
+        playTone(880, 0, 0.05, 0.08);
+        navigator.vibrate?.(8);
+      };
+
+      const fanfare = () => {
+        [523, 659, 784, 1047].forEach((frequency, i) =>
+          playTone(frequency, i * 0.09, 0.3, 0.12)
+        );
+        navigator.vibrate?.([60, 40, 120]);
+      };
+
+      // Random, so colour does not follow touch order.
+      const freeSlot = () => {
+        const used = new Set(
+          Array.from(touchPoints.values(), (p) => p.slot)
+        );
+        const free = [];
+        for (let slot = 0; slot < MAX_TOUCHES; slot++) {
+          if (!used.has(slot)) free.push(slot);
+        }
+        if (free.length === 0) return -1;
+        return free[Math.floor(Math.random() * free.length)];
+      };
+
+      const updateHint = () => {
+        hint.classList.toggle(
+          "visible",
+          phase === "waiting" && touchPoints.size === 1
+        );
+      };
+
+      const restartStabilityTimer = () => {
+        clearTimeout(stabilityTimer);
+        for (const p of touchPoints.values()) {
+          p.anchorX = p.fingerX;
+          p.anchorY = p.fingerY;
+        }
+        if (phase === "waiting" && touchPoints.size >= MIN_PLAYERS) {
+          stabilityTimer = setTimeout(startSelection, STABILITY_DELAY);
+        }
+        updateHint();
+      };
+
+      const handlePointerDown = (e) => {
+        e.preventDefault();
+        unlockAudio();
+        if (phase !== "waiting") return;
+
+        const slot = freeSlot();
+        if (slot === -1) return;
+
+        touchContainer.setPointerCapture(e.pointerId);
+
+        const element = document.createElement("div");
+        element.className = `touch-point slot-${slot}`;
+        element.innerHTML = '<div class="ring"></div>';
+        element.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        touchContainer.appendChild(element);
+
+        touchPoints.set(e.pointerId, {
+          x: e.clientX,
+          y: e.clientY,
+          vx: 0,
+          vy: 0,
+          fingerX: e.clientX,
+          fingerY: e.clientY,
+          slot,
+          element,
+          fingerLifted: false,
+        });
+
+        restartStabilityTimer();
+        startPhysicsLoop();
+      };
+
+      const handlePointerMove = (e) => {
+        if (phase !== "waiting") return;
+        const p = touchPoints.get(e.pointerId);
+        if (!p) return;
+
+        p.fingerX = e.clientX;
+        p.fingerY = e.clientY;
+
+        const moved = Math.hypot(p.fingerX - p.anchorX, p.fingerY - p.anchorY);
+        if (moved > MOVEMENT_THRESHOLD) {
+          restartStabilityTimer();
+        }
+      };
+
+      const handlePointerUp = (e) => {
+        const p = touchPoints.get(e.pointerId);
+        if (!p) return;
+
+        if (phase === "waiting") {
+          p.element.remove();
+          touchPoints.delete(e.pointerId);
+          restartStabilityTimer();
+          if (touchPoints.size === 0) stopPhysicsLoop();
+        } else {
+          p.fingerLifted = true;
+          maybeReset();
+        }
+      };
+
+      const startPhysicsLoop = () => {
+        if (physicsAnimationId === null) {
+          lastFrameTime = null;
+          physicsAnimationId = requestAnimationFrame(updatePhysics);
+        }
+      };
+
+      const stopPhysicsLoop = () => {
+        if (physicsAnimationId !== null) {
+          cancelAnimationFrame(physicsAnimationId);
+          physicsAnimationId = null;
+        }
+      };
+
+      const updatePhysics = (now) => {
+        const step =
+          lastFrameTime === null
+            ? 1
+            : Math.min((now - lastFrameTime) / FRAME_MS, MAX_FRAME_STEP);
+        lastFrameTime = now;
+
+        const points = Array.from(touchPoints.values());
+        const minDistance = TOUCH_RADIUS * 2;
+        const squashEnabled = !reducedMotion.matches;
+
+        for (const p of points) {
+          p.vx += (p.fingerX - p.x) * SPRING_STRENGTH * step;
+          p.vy += (p.fingerY - p.y) * SPRING_STRENGTH * step;
+
+          for (const other of points) {
+            if (p === other) continue;
+
+            const dx = other.x - p.x;
+            const dy = other.y - p.y;
+            const distance = Math.hypot(dx, dy);
+
+            if (distance > 0 && distance < minDistance) {
+              const force =
+                ((minDistance - distance) * REPULSION_STRENGTH * step) /
+                distance;
+              p.vx -= dx * force;
+              p.vy -= dy * force;
+            }
+          }
+        }
+
+        const damping = DAMPING ** step;
+        for (const p of points) {
+          p.vx *= damping;
+          p.vy *= damping;
+          p.x += p.vx * step;
+          p.y += p.vy * step;
+
+          let transform = `translate3d(${p.x}px, ${p.y}px, 0)`;
+          if (squashEnabled) {
+            const speed = Math.hypot(p.vx, p.vy);
+            const squash = Math.min(speed * SQUASH_FACTOR, MAX_SQUASH);
+            const angle = Math.atan2(p.vy, p.vx);
+            transform += ` rotate(${angle}rad) scale(${1 + squash}, ${
+              1 - squash
+            })`;
+          }
+          p.element.style.transform = transform;
+        }
+
+        physicsAnimationId = requestAnimationFrame(updatePhysics);
+      };
+
+      const clockwiseOrder = () => {
+        const entries = Array.from(touchPoints.entries());
+        const cx = entries.reduce((sum, [, p]) => sum + p.x, 0) / entries.length;
+        const cy = entries.reduce((sum, [, p]) => sum + p.y, 0) / entries.length;
+        return entries
+          .map(([id, p]) => ({ id, angle: Math.atan2(p.y - cy, p.x - cx) }))
+          .sort((a, b) => a.angle - b.angle)
+          .map(({ id }) => id);
+      };
+
+      const highlight = (id) => {
+        for (const [pointId, p] of touchPoints) {
+          p.element.classList.toggle("active", pointId === id);
+        }
+        tick();
+      };
+
+      const startSelection = async () => {
+        if (phase !== "waiting" || touchPoints.size < MIN_PLAYERS) return;
+
+        stopPhysicsLoop();
+        phase = "spinning";
+        updateHint();
+        instructions.style.opacity = "0";
+        touchContainer.classList.add("spinning");
+
+        for (const p of touchPoints.values()) {
+          p.element.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`;
+        }
+
+        const order = clockwiseOrder();
+        const winnerIndex = Math.floor(Math.random() * order.length);
+        const startIndex = Math.floor(Math.random() * order.length);
+
+        let index = startIndex;
+        let delay = SPIN_DELAY;
+        for (let step = 0; ; step++) {
+          highlight(order[index]);
+          const slowing = step >= SPIN_CYCLES * order.length;
+          if (slowing) delay += SPIN_SLOWDOWN;
+          await sleep(delay);
+          if (slowing && index === winnerIndex) break;
+          index = (index + 1) % order.length;
+        }
+
+        showResult(order[winnerIndex]);
+      };
+
+      const showResult = (winnerId) => {
+        phase = "result";
+        resultShownAt = Date.now();
+        touchContainer.classList.remove("spinning");
+
+        for (const [id, p] of touchPoints) {
+          p.element.classList.remove("active");
+          p.element.classList.add(id === winnerId ? "winner" : "loser");
+        }
+
+        const winner = touchPoints.get(winnerId);
+        flood.style.setProperty("--flood-color", `var(--color-${winner.slot})`);
+        flood.style.setProperty("--flood-x", `${winner.x}px`);
+        flood.style.setProperty("--flood-y", `${winner.y}px`);
+        flood.classList.add("visible");
+        fanfare();
+
+        maybeReset();
+      };
+
+      const maybeReset = () => {
+        if (phase !== "result") return;
+        const allLifted = Array.from(touchPoints.values()).every(
+          (p) => p.fingerLifted
+        );
+        if (!allLifted) return;
+
+        clearTimeout(resetTimeout);
+        const remaining = MIN_RESULT_DISPLAY - (Date.now() - resultShownAt);
+        if (remaining > 0) {
+          resetTimeout = setTimeout(resetGame, remaining);
+        } else {
+          resetGame();
+        }
+      };
+
+      const resetGame = () => {
+        clearTimeout(resetTimeout);
+        phase = "waiting";
+        touchContainer.replaceChildren();
+        touchPoints.clear();
+        flood.classList.remove("visible");
+        instructions.style.opacity = "1";
+        updateHint();
+      };
+
+      touchContainer.addEventListener("pointerdown", handlePointerDown);
+      touchContainer.addEventListener("pointermove", handlePointerMove);
+      touchContainer.addEventListener("pointerup", handlePointerUp);
+      touchContainer.addEventListener("pointercancel", handlePointerUp);
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js");
+      }
+    </script>
+  </body>
+</html>
